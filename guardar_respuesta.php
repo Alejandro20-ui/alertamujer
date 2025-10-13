@@ -20,33 +20,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         ]);
         exit();
     }
+
+    // Verificar usuario
     $check = $conn->prepare("SELECT id FROM usuarios WHERE id = ?");
-    $check->bind_param("i", $idUsuario);
-    $check->execute();
-    $result = $check->get_result();
-    if ($result->num_rows == 0) {
+    $check->execute([$idUsuario]);
+    $result = $check->fetchAll();
+
+    if (count($result) === 0) {
         echo json_encode(["status" => "error", "message" => "Usuario no válido"]);
         exit();
     }
-    $stmt = $conn->prepare("INSERT INTO respuestas_autoevaluacion (idUsuario, fase, pregunta, respuesta, valor) 
+
+    // Insertar o actualizar respuesta
+    $stmt = $conn->prepare("INSERT INTO respuestas_autoevaluacion (idUsuario, fase, pregunta, respuesta, valor)
                             VALUES (?, ?, ?, ?, ?)
                             ON DUPLICATE KEY UPDATE respuesta = VALUES(respuesta), valor = VALUES(valor)");
-    $stmt->bind_param("isiss", $idUsuario, $fase, $pregunta, $respuesta, $valor);
+    $stmt->execute([$idUsuario, $fase, $pregunta, $respuesta, $valor]);
 
-    if ($stmt->execute()) {
-        echo json_encode([
-            "status" => "success",
-            "message" => "Respuesta guardada"
-        ]);
-    } else {
-        echo json_encode([
-            "status" => "error",
-            "message" => "Error SQL: " . $conn->error
-        ]);
-    }
+    echo json_encode([
+        "status" => "success",
+        "message" => "Respuesta guardada"
+    ]);
 
-    $stmt->close();
-    $conn->close();
 } else {
     echo json_encode(["status" => "error", "message" => "Método no permitido"]);
 }

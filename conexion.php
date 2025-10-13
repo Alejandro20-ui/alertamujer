@@ -1,15 +1,17 @@
 <?php
-$host = getenv('MYSQLHOST') ?: ($_ENV['MYSQLHOST'] ?? 'localhost');
-$user = getenv('MYSQLUSER') ?: ($_ENV['MYSQLUSER'] ?? 'root');
-$pass = getenv('MYSQLPASSWORD') ?: ($_ENV['MYSQLPASSWORD'] ?? '');
-$db   = getenv('MYSQLDATABASE') ?: ($_ENV['MYSQLDATABASE'] ?? 'alertamujer');
-$port = getenv('MYSQLPORT') ?: ($_ENV['MYSQLPORT'] ?? 3306);
+header("Content-Type: application/json; charset=UTF-8");
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
-$conn = new mysqli($host, $user, $pass, $db, $port);
-if ($conn->connect_error) {
-    die(json_encode(array("status"=>"error","message"=>"Error de conexión: " . $conn->connect_error)));
-}
+$host = getenv('MYSQLHOST') ?: 'NO_HOST';
+$user = getenv('MYSQLUSER') ?: 'NO_USER';
+$pass = getenv('MYSQLPASSWORD') ?: 'NO_PASS';
+$db   = getenv('MYSQLDATABASE') ?: 'NO_DB';
+$port = getenv('MYSQLPORT') ?: 'NO_PORT';
 
-// Establecer charset UTF-8
-$conn->set_charset("utf8mb4");
-?>
+echo json_encode([
+    "MYSQLHOST" => $host,
+    "MYSQLUSER" => $user,
+    "MYSQLDATABASE" => $db,
+    "MYSQLPORT" => $port
+]);

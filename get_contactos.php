@@ -7,7 +7,7 @@ $pass = $_ENV['MYSQLPASSWORD'] ?? '';
 $db   = $_ENV['MYSQLDATABASE'] ?? 'alertamujer';
 $port = $_ENV['MYSQLPORT'] ?? 3306;
 
-$conn = new mysqli($servername, $username, $password, $dbname);
+$conn = new mysqli($host, $user, $pass, $db, $port);
 if ($conn->connect_error) {
     echo json_encode(["error" => "Error de conexión"]);
     exit;

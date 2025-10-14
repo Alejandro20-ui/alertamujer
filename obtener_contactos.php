@@ -8,7 +8,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $idUsuario = isset($_POST["idUsuario"]) ? intval($_POST["idUsuario"]) : 0;
 
     if ($idUsuario <= 0) {
-        echo json_encode(["status" => "error", "message" => "ID de usuario inválido"]);
+        echo json_encode(["status" =>"error", "message" => "ID de usuario inválido"]);
         exit();
     }
 
@@ -28,7 +28,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $contactos = [];
     while ($row = $result->fetch_assoc()) {
         if (!empty($row['imagen'])) {
-            $row['imagen'] = "https://warmi360-production.up.railway.app/" . $row['imagen'];
+            $rutaLocal = __DIR__ . '/' . $row['imagen'];
+            if (file_exists($rutaLocal)) {
+        $row['imagen'] = "https://warmi360-production.up.railway.app/" . $row['imagen'];
+        } else {
+            $row['imagen'] = null;
+        }
         }
         $contactos[] = $row;
     }

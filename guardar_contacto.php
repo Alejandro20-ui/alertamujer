@@ -24,7 +24,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $fileName = uniqid() . '_' . basename($_FILES['imagen']['name']);
         $targetPath = $uploadDir . $fileName;
         if (move_uploaded_file($_FILES['imagen']['tmp_name'], $targetPath)) {
-            $imagenPath = $targetPath;
+            $imagenPath = 'uploads/' . $fileName;
         } else {
             echo json_encode(["status" => "error", "message" => "Error al mover la imagen"]);
             exit();

@@ -1,18 +1,21 @@
-# Imagen base de PHP con Apache
+# Usar la imagen oficial de PHP con Apache
 FROM php:8.2-apache
 
-# Instalar extensiones necesarias
+# Instalar extensiones necesarias para MySQL (soluciona "could not find driver")
 RUN docker-php-ext-install mysqli pdo pdo_mysql
 
-# Copiar los archivos del proyecto al servidor
-COPY . /var/www/html/
+# Habilitar mod_rewrite por si usas rutas amigables
+RUN a2enmod rewrite
 
-# Configurar Apache para escuchar el puerto dinámico asignado por Railway
-ENV PORT=8080
-RUN sed -i 's/80/${PORT}/g' /etc/apache2/sites-available/000-default.conf /etc/apache2/ports.conf
+# Establecer el directorio de trabajo dentro del contenedor
+WORKDIR /var/www/html
 
-# Exponer el puerto
-EXPOSE ${PORT}
+# Copiar todos los archivos del proyecto al contenedor
+COPY . .
 
-# Comando de inicio
-CMD ["apache2-foreground"]
+# Exponer el puerto que usará el contenedor
+EXPOSE 8080
+
+# Comando para iniciar el servidor PHP
+# Usa el puerto de entorno $PORT (si existe) o 8080 por defecto
+CMD php -S 0.0.0.0:${PORT:-8080} -t .

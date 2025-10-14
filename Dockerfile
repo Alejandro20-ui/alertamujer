@@ -3,6 +3,8 @@ FROM php:8.2-apache
 
 # Instalar extensión mysqli (necesaria para MySQL)
 RUN docker-php-ext-install mysqli
+# Crear carpeta de uploads con permisos
+RUN mkdir -p /var/www/html/uploads && chmod 777 /var/www/html/uploads
 
 # Habilitar mod_rewrite y configurar ServerName
 RUN a2enmod rewrite

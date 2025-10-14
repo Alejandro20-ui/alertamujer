@@ -28,7 +28,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $contactos = [];
     while ($row = $result->fetch_assoc()) {
         if (!empty($row['imagen'])) {
-            $row['imagen'] = "http://10.0.2.2/alertamujer/" . $row['imagen'];
+            $row['imagen'] = "https://warmi360-production.up.railway.app/" . $row['imagen'];
         }
         $contactos[] = $row;
     }

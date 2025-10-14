@@ -2,19 +2,16 @@
 FROM php:8.2-apache
 
 # Instalar extensiones necesarias para MySQL
-RUN docker-php-ext-install mysqli pdo pdo_mysql
+RUN docker-php-ext-install mysqli
 
-# Habilitar mod_rewrite (por si usas .htaccess)
-RUN a2enmod rewrite
+# Copiar archivos de tu app
+COPY . /var/www/html/
 
 # Establecer el directorio de trabajo
 WORKDIR /var/www/html
 
-# Copiar archivos del proyecto al contenedor
-COPY . .
-
-# Exponer puerto 8080 (Railway lo detecta automáticamente)
+# Exponer el puerto (Railway necesita saberlo)
 EXPOSE 8080
 
-# Usamos /bin/sh -c para que Railway sustituya correctamente la variable $PORT
-CMD ["/bin/sh", "-c", "php -S 0.0.0.0:${PORT:-8080} -t ."]
+# Iniciar Apache en el puerto que Railway asigna
+CMD apachectl -D FOREGROUND

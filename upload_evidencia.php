@@ -16,6 +16,9 @@ try {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         throw new Exception('Método no permitido');
     }
+    if (empty($_POST) && empty($_FILES)) {
+    throw new Exception('La solicitud está vacía. ¿El archivo es demasiado grande?');
+}
 
     if (!isset($_POST['user_id']) || !isset($_POST['tipo']) || !isset($_FILES['archivo'])) {
         throw new Exception('Faltan datos requeridos');
@@ -29,6 +32,16 @@ try {
     }
 
     $archivo = $_FILES['archivo'];
+    $errorMessages = [
+    UPLOAD_ERR_OK => 'Sin error',
+    UPLOAD_ERR_INI_SIZE => 'El archivo excede upload_max_filesize',
+    UPLOAD_ERR_FORM_SIZE => 'El archivo excede MAX_FILE_SIZE en el formulario',
+    UPLOAD_ERR_PARTIAL => 'El archivo se subió parcialmente',
+    UPLOAD_ERR_NO_FILE => 'No se subió ningún archivo',
+    UPLOAD_ERR_NO_TMP_DIR => 'Falta carpeta temporal',
+    UPLOAD_ERR_CANT_WRITE => 'Error al escribir en disco',
+    UPLOAD_ERR_EXTENSION => 'Extensión PHP detuvo la subida',
+];
 
     if ($archivo['error'] !== UPLOAD_ERR_OK) {
         throw new Exception('Error al subir el archivo: ' . $archivo['error']);

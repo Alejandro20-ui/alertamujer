@@ -2,7 +2,7 @@
 FROM php:8.2-apache
 
 # Instalar extensión mysqli (para MySQL)
-RUN docker-php-ext-install mysqli
+RUN docker-php-ext-install mysqli pdo pdo_mysql
 
 # Copiar todos los archivos del proyecto al contenedor
 WORKDIR /var/www/html

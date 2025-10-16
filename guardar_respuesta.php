@@ -21,7 +21,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         exit();
     }
 
-    // ✅ Verificar si el usuario existe
     $check = $conn->prepare("SELECT id FROM usuarios WHERE id = ?");
     $check->bind_param("i", $idUsuario);
     $check->execute();
@@ -32,7 +31,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         exit();
     }
 
-    // ✅ Guardar o actualizar respuesta
     $stmt = $conn->prepare("INSERT INTO respuestas_autoevaluacion (idUsuario, fase, pregunta, respuesta, valor) 
                             VALUES (?, ?, ?, ?, ?)
                             ON DUPLICATE KEY UPDATE respuesta = VALUES(respuesta), valor = VALUES(valor)");

@@ -9,20 +9,29 @@ $port = $_ENV['MYSQLPORT'] ?? 3306;
 
 $conn = new mysqli($host, $user, $pass, $db, $port);
 if ($conn->connect_error) {
-    echo json_encode(["error" => "Error de conexión"]);
+    http_response_code(500);
+    echo json_encode(["error" => "Error de conexión a la base de datos"]);
     exit;
 }
 
 $usuario_id = isset($_GET['usuario_id']) ? intval($_GET['usuario_id']) : 0;
 if ($usuario_id <= 0) {
-    echo json_encode(["error" => "Usuario inválido"]);
+    http_response_code(400);
+    echo json_encode(["error" => "ID de usuario inválido"]);
     exit;
 }
 
+// ✅ Usa el nombre correcto de la tabla y del campo
 $sql = "SELECT id, nombre, apellidos, numero, vinculo, imagen
         FROM contactos_confianza
-        WHERE usuario_id = ?";
+        WHERE idUsuario = ?";
 $stmt = $conn->prepare($sql);
+if (!$stmt) {
+    http_response_code(500);
+    echo json_encode(["error" => "Error al preparar la consulta"]);
+    exit;
+}
+
 $stmt->bind_param("i", $usuario_id);
 $stmt->execute();
 $result = $stmt->get_result();

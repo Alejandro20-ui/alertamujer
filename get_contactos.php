@@ -20,7 +20,7 @@ if ($usuario_id <= 0) {
 }
 
 $sql = "SELECT id, nombre, apellidos, numero, vinculo, imagen
-        FROM contactos
+        FROM contactos_confianza
         WHERE usuario_id = ?";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("i", $usuario_id);

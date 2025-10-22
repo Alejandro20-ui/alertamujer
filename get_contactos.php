@@ -21,7 +21,6 @@ if ($usuario_id <= 0) {
     exit;
 }
 
-// ✅ Usa el nombre correcto de la tabla y del campo
 $sql = "SELECT id, nombre, apellidos, numero, vinculo, imagen
         FROM contactos_confianza
         WHERE idUsuario = ?";

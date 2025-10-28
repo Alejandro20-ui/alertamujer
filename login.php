@@ -11,6 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 error_reporting(0);
 
+// Configuración de base de datos
 $host = $_ENV['MYSQLHOST'] ?? 'localhost';
 $user = $_ENV['MYSQLUSER'] ?? 'root';
 $pass = $_ENV['MYSQLPASSWORD'] ?? '';
@@ -23,30 +24,12 @@ if ($conn->connect_error) {
     exit();
 }
 
-function getClientIP() {
-    if (!empty($_SERVER['HTTP_CLIENT_IP'])) return $_SERVER['HTTP_CLIENT_IP'];
-    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-        $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
-        return trim($ips[0]);
-    }
-    return $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-}
-
-function insert_intrusion_log($conn, $nombre, $apellidos, $numero, $ip, $payload, $detected, $status) {
-    $stmt = $conn->prepare("INSERT INTO intrusion_logs (nombre, apellidos, numero, ip, payload, detected, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    if (!$stmt) return false;
-    $det = $detected ? 1 : 0;
-    $stmt->bind_param("sssssis", $nombre, $apellidos, $numero, $ip, $payload, $det, $status);
-    $ok = $stmt->execute();
-    $stmt->close();
-    return $ok;
-}
-
+// Lee los datos
 $nombre = '';
 $apellidos = '';
 $numero = '';
+$correo = '';
 
-// Verifica si viene como JSON
 $contentType = $_SERVER["CONTENT_TYPE"] ?? '';
 if (strpos($contentType, 'application/json') !== false) {
     $json = file_get_contents('php://input');
@@ -55,98 +38,94 @@ if (strpos($contentType, 'application/json') !== false) {
         $nombre = trim($data['nombre'] ?? '');
         $apellidos = trim($data['apellidos'] ?? '');
         $numero = trim($data['numero'] ?? '');
+        $correo = trim($data['correo'] ?? '');
     }
 } else {
-    // POST tradicional
     $nombre = trim($_POST['nombre'] ?? '');
     $apellidos = trim($_POST['apellidos'] ?? '');
     $numero = trim($_POST['numero'] ?? '');
+    $correo = trim($_POST['correo'] ?? '');
 }
 
-$ip = getClientIP();
-$payload = json_encode(['nombre'=>$nombre,'apellidos'=>$apellidos,'numero'=>$numero]);
-
-// Validación básica de campos vacíos
-if (empty($nombre) || empty($apellidos) || empty($numero)) {
+// Validación de campos vacíos
+if (empty($nombre) || empty($apellidos) || empty($numero) || empty($correo)) {
     echo json_encode(['status' => 'error', 'message' => 'Todos los campos son obligatorios.']);
     $conn->close();
     exit();
 }
 
-// ------------- DETECCIÓN DE PATRONES SOSPECHOSOS (MEJORADA) -------------
-$is_suspicious = false;
-
-// Patrones SQL más específicos para evitar falsos positivos
-$sql_keywords_pattern = '/(\b(SELECT|UNION|INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|EXEC|EXECUTE)\b.*\b(FROM|WHERE|INTO|TABLE)\b)/i';
-$danger_chars_pattern = '/(--|;.*SELECT|\/\*.*\*\/|@@|0x[0-9a-f]+)/i';
-
-// Solo marca como sospechoso si hay patrones SQL realmente peligrosos
-if (preg_match($sql_keywords_pattern, $payload) || preg_match($danger_chars_pattern, $payload)) {
-    $is_suspicious = true;
-}
-
-// Validación de nombre: permite letras, espacios y acentos (MEJORADA - más permisiva)
+// Validaciones
 if (!preg_match('/^[a-zA-ZÁÉÍÓÚáéíóúñÑüÜ\s\'-]{1,100}$/u', $nombre)) {
-    $is_suspicious = true;
+    echo json_encode(['status' => 'error', 'message' => 'El nombre contiene caracteres inválidos.']);
+    $conn->close();
+    exit();
 }
 
-// Validación de apellidos: permite letras, espacios y acentos (MEJORADA - más permisiva)
 if (!preg_match('/^[a-zA-ZÁÉÍÓÚáéíóúñÑüÜ\s\'-]{1,100}$/u', $apellidos)) {
-    $is_suspicious = true;
+    echo json_encode(['status' => 'error', 'message' => 'Los apellidos contienen caracteres inválidos.']);
+    $conn->close();
+    exit();
 }
 
-// Validación de número: 9 dígitos (puedes ajustar según tu país)
 if (!preg_match('/^[0-9]{9,15}$/', $numero)) {
-    $is_suspicious = true;
-}
-
-// Si es sospechoso, registra y bloquea
-if ($is_suspicious) {
-    insert_intrusion_log($conn, $nombre, $apellidos, $numero, $ip, $payload, 1, 'detenido');
-    echo json_encode(['status' => 'error', 'message' => 'Entrada inválida detectada.']);
+    echo json_encode(['status' => 'error', 'message' => 'El número debe tener entre 9 y 15 dígitos.']);
     $conn->close();
     exit();
 }
 
-// Consulta preparada para prevenir SQL injection
-$stmt = $conn->prepare("SELECT id FROM usuarios WHERE nombre = ? AND apellidos = ? AND numero = ? LIMIT 1");
+if (!filter_var($correo, FILTER_VALIDATE_EMAIL)) {
+    echo json_encode(['status' => 'error', 'message' => 'El correo electrónico no es válido.']);
+    $conn->close();
+    exit();
+}
+
+// Verifica si el usuario ya existe
+$stmt = $conn->prepare("SELECT id FROM usuarios WHERE numero = ? OR correo = ? LIMIT 1");
 if (!$stmt) {
-    insert_intrusion_log($conn, $nombre, $apellidos, $numero, $ip, $payload . " -- prepare_failed: " . $conn->error, 0, 'peligro');
     echo json_encode(['status' => 'error', 'message' => 'Error interno del servidor.']);
     $conn->close();
     exit();
 }
 
-$stmt->bind_param("sss", $nombre, $apellidos, $numero);
-$execOk = $stmt->execute();
+$stmt->bind_param("ss", $numero, $correo);
+$stmt->execute();
+$result = $stmt->get_result();
 
-if (!$execOk) {
-    insert_intrusion_log($conn, $nombre, $apellidos, $numero, $ip, $payload . " -- execute_failed: " . $stmt->error, 0, 'peligro');
-    echo json_encode(['status' => 'error', 'message' => 'Error interno del servidor.']);
+if ($result->num_rows > 0) {
+    // Usuario ya existe
+    $row = $result->fetch_assoc();
+    echo json_encode([
+        'status' => 'exists',
+        'message' => 'El usuario ya está registrado.',
+        'idUsuario' => (int)$row['id']
+    ]);
     $stmt->close();
     $conn->close();
     exit();
 }
+$stmt->close();
 
-$result = $stmt->get_result();
-if ($result && $result->num_rows > 0) {
-    $row = $result->fetch_assoc();
-    
-    // Login exitoso - registra como acceso legítimo
-    insert_intrusion_log($conn, $nombre, $apellidos, $numero, $ip, $payload, 0, 'exitoso');
-    
+// Inserta nuevo usuario
+$stmt = $conn->prepare("INSERT INTO usuarios (nombre, apellidos, numero, correo) VALUES (?, ?, ?, ?)");
+if (!$stmt) {
+    echo json_encode(['status' => 'error', 'message' => 'Error al preparar la consulta.']);
+    $conn->close();
+    exit();
+}
+
+$stmt->bind_param("ssss", $nombre, $apellidos, $numero, $correo);
+
+if ($stmt->execute()) {
+    $idUsuario = $conn->insert_id;
     echo json_encode([
         'status' => 'success',
-        'message' => 'Login exitoso',
-        'idUsuario' => (int)$row['id']
+        'message' => 'Registro exitoso.',
+        'idUsuario' => $idUsuario
     ]);
 } else {
-    // Credenciales incorrectas
-    insert_intrusion_log($conn, $nombre, $apellidos, $numero, $ip, $payload, 0, 'fallido');
-    
     echo json_encode([
         'status' => 'error',
-        'message' => 'Credenciales incorrectas. Verifica tus datos.'
+        'message' => 'Error al registrar usuario: ' . $stmt->error
     ]);
 }
 

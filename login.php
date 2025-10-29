@@ -1,16 +1,16 @@
 <?php
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header("Content-Type: application/json; charset=UTF-8");
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: POST");
+header("Access-Control-Allow-Headers: Content-Type");
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
+if ($_SERVER["REQUEST_METHOD"] !== "POST") {
+    http_response_code(405);
+    echo json_encode(["status" => "error", "message" => "Método no permitido"]);
     exit();
 }
 
-error_reporting(0);
-
+// Conexión a la base de datos
 $host = $_ENV['MYSQLHOST'] ?? 'localhost';
 $user = $_ENV['MYSQLUSER'] ?? 'root';
 $pass = $_ENV['MYSQLPASSWORD'] ?? '';
@@ -19,7 +19,8 @@ $port = $_ENV['MYSQLPORT'] ?? 3306;
 
 $conn = new mysqli($host, $user, $pass, $db, $port);
 if ($conn->connect_error) {
-    echo json_encode(['status' => 'error', 'message' => 'Error de conexión a la base de datos.']);
+    error_log("DB Connection failed: " . $conn->connect_error);
+    echo json_encode(["status" => "error", "message" => "Error interno del servidor"]);
     exit();
 }
 
@@ -42,61 +43,44 @@ function insert_intrusion_log($conn, $nombre, $apellidos, $numero, $ip, $payload
     return $ok;
 }
 
-// Lee los datos - soporta tanto POST tradicional como JSON
-$nombre = '';
-$apellidos = '';
-$numero = '';
-
-// Verifica si viene como JSON
-$contentType = $_SERVER["CONTENT_TYPE"] ?? '';
-if (strpos($contentType, 'application/json') !== false) {
-    $json = file_get_contents('php://input');
-    $data = json_decode($json, true);
-    if ($data) {
-        $nombre = trim($data['nombre'] ?? '');
-        $apellidos = trim($data['apellidos'] ?? '');
-        $numero = trim($data['numero'] ?? '');
-    }
-} else {
-    // POST tradicional
-    $nombre = trim($_POST['nombre'] ?? '');
-    $apellidos = trim($_POST['apellidos'] ?? '');
-    $numero = trim($_POST['numero'] ?? '');
-}
+// Obtener datos del POST
+$nombre = trim($_POST["nombre"] ?? '');
+$apellidos = trim($_POST["apellidos"] ?? '');
+$numero = trim($_POST["numero"] ?? '');
 
 $ip = getClientIP();
-$payload = json_encode(['nombre'=>$nombre,'apellidos'=>$apellidos,'numero'=>$numero]);
+$payload = json_encode(['nombre' => $nombre, 'apellidos' => $apellidos, 'numero' => $numero]);
 
 // Validación básica de campos vacíos
 if (empty($nombre) || empty($apellidos) || empty($numero)) {
+    insert_intrusion_log($conn, $nombre, $apellidos, $numero, $ip, $payload, 0, 'campos_vacios');
     echo json_encode(['status' => 'error', 'message' => 'Todos los campos son obligatorios.']);
     $conn->close();
     exit();
 }
 
-// ------------- DETECCIÓN DE PATRONES SOSPECHOSOS (MEJORADA) -------------
+// ------------- DETECCIÓN DE PATRONES SOSPECHOSOS (AJUSTADA) -------------
 $is_suspicious = false;
 
-// Patrones SQL más específicos para evitar falsos positivos
+// Patrones SQL peligrosos (más precisos, evita falsos positivos)
 $sql_keywords_pattern = '/(\b(SELECT|UNION|INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|EXEC|EXECUTE)\b.*\b(FROM|WHERE|INTO|TABLE)\b)/i';
 $danger_chars_pattern = '/(--|;.*SELECT|\/\*.*\*\/|@@|0x[0-9a-f]+)/i';
 
-// Solo marca como sospechoso si hay patrones SQL realmente peligrosos
 if (preg_match($sql_keywords_pattern, $payload) || preg_match($danger_chars_pattern, $payload)) {
     $is_suspicious = true;
 }
 
-// Validación de nombre: permite letras, espacios y acentos (MEJORADA - más permisiva)
+// Validación de nombre: permite letras, acentos, espacios, guiones y apóstrofes
 if (!preg_match('/^[a-zA-ZÁÉÍÓÚáéíóúñÑüÜ\s\'-]{1,100}$/u', $nombre)) {
     $is_suspicious = true;
 }
 
-// Validación de apellidos: permite letras, espacios y acentos (MEJORADA - más permisiva)
+// Validación de apellidos: mismo criterio
 if (!preg_match('/^[a-zA-ZÁÉÍÓÚáéíóúñÑüÜ\s\'-]{1,100}$/u', $apellidos)) {
     $is_suspicious = true;
 }
 
-// Validación de número: 9 dígitos (puedes ajustar según tu país)
+// Validación de número: 9 a 15 dígitos (más flexible)
 if (!preg_match('/^[0-9]{9,15}$/', $numero)) {
     $is_suspicious = true;
 }
@@ -132,19 +116,15 @@ if (!$execOk) {
 $result = $stmt->get_result();
 if ($result && $result->num_rows > 0) {
     $row = $result->fetch_assoc();
-    
-    // Login exitoso - registra como acceso legítimo
+    // Login exitoso
     insert_intrusion_log($conn, $nombre, $apellidos, $numero, $ip, $payload, 0, 'exitoso');
-    
     echo json_encode([
         'status' => 'success',
-        'message' => 'Login exitoso',
         'idUsuario' => (int)$row['id']
     ]);
 } else {
     // Credenciales incorrectas
     insert_intrusion_log($conn, $nombre, $apellidos, $numero, $ip, $payload, 0, 'fallido');
-    
     echo json_encode([
         'status' => 'error',
         'message' => 'Credenciales incorrectas. Verifica tus datos.'

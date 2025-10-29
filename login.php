@@ -10,6 +10,8 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     exit();
 }
 
+error_reporting(0); // ⚠️ Silencia todos los errores de PHP
+
 // Conexión a la base de datos
 $host = $_ENV['MYSQLHOST'] ?? 'localhost';
 $user = $_ENV['MYSQLUSER'] ?? 'root';
@@ -59,10 +61,10 @@ if (empty($nombre) || empty($apellidos) || empty($numero)) {
     exit();
 }
 
-// ------------- DETECCIÓN DE PATRONES SOSPECHOSOS (AJUSTADA) -------------
+// ------------- DETECCIÓN DE PATRONES SOSPECHOSOS -------------
 $is_suspicious = false;
 
-// Patrones SQL peligrosos (más precisos, evita falsos positivos)
+// Patrones SQL peligrosos
 $sql_keywords_pattern = '/(\b(SELECT|UNION|INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|EXEC|EXECUTE)\b.*\b(FROM|WHERE|INTO|TABLE)\b)/i';
 $danger_chars_pattern = '/(--|;.*SELECT|\/\*.*\*\/|@@|0x[0-9a-f]+)/i';
 
@@ -70,17 +72,15 @@ if (preg_match($sql_keywords_pattern, $payload) || preg_match($danger_chars_patt
     $is_suspicious = true;
 }
 
-// Validación de nombre: permite letras, acentos, espacios, guiones y apóstrofes
+// Validación de nombre y apellidos (permisiva)
 if (!preg_match('/^[a-zA-ZÁÉÍÓÚáéíóúñÑüÜ\s\'-]{1,100}$/u', $nombre)) {
     $is_suspicious = true;
 }
-
-// Validación de apellidos: mismo criterio
 if (!preg_match('/^[a-zA-ZÁÉÍÓÚáéíóúñÑüÜ\s\'-]{1,100}$/u', $apellidos)) {
     $is_suspicious = true;
 }
 
-// Validación de número: 9 a 15 dígitos (más flexible)
+// Validación de número (9 a 15 dígitos)
 if (!preg_match('/^[0-9]{9,15}$/', $numero)) {
     $is_suspicious = true;
 }
@@ -93,7 +93,7 @@ if ($is_suspicious) {
     exit();
 }
 
-// Consulta preparada para prevenir SQL injection
+// Consulta preparada
 $stmt = $conn->prepare("SELECT id FROM usuarios WHERE nombre = ? AND apellidos = ? AND numero = ? LIMIT 1");
 if (!$stmt) {
     insert_intrusion_log($conn, $nombre, $apellidos, $numero, $ip, $payload . " -- prepare_failed: " . $conn->error, 0, 'peligro');
@@ -116,14 +116,12 @@ if (!$execOk) {
 $result = $stmt->get_result();
 if ($result && $result->num_rows > 0) {
     $row = $result->fetch_assoc();
-    // Login exitoso
     insert_intrusion_log($conn, $nombre, $apellidos, $numero, $ip, $payload, 0, 'exitoso');
     echo json_encode([
         'status' => 'success',
         'idUsuario' => (int)$row['id']
     ]);
 } else {
-    // Credenciales incorrectas
     insert_intrusion_log($conn, $nombre, $apellidos, $numero, $ip, $payload, 0, 'fallido');
     echo json_encode([
         'status' => 'error',

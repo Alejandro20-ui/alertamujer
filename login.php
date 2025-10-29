@@ -19,12 +19,6 @@ ini_set('display_errors', 1);
 
 include "conexion.php";
 
-$conn = new mysqli($host, $user, $pass, $db, $port);
-if ($conn->connect_error) {
-    error_log("DB Connection failed: " . $conn->connect_error);
-    echo json_encode(["status" => "error", "message" => "Error interno del servidor"]);
-    exit();
-}
 
 function getClientIP() {
     if (!empty($_SERVER['HTTP_CLIENT_IP'])) return $_SERVER['HTTP_CLIENT_IP'];

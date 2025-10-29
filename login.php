@@ -3,6 +3,10 @@ header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST");
 header("Access-Control-Allow-Headers: Content-Type");
+// Manejo de preflight OPTIONS (para CORS)
+if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
+    exit(0);
+}
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     http_response_code(405);
@@ -10,14 +14,10 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     exit();
 }
 
-error_reporting(0); // ⚠️ Silencia todos los errores de PHP
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
-// Conexión a la base de datos
-$host = $_ENV['MYSQLHOST'] ?? 'localhost';
-$user = $_ENV['MYSQLUSER'] ?? 'root';
-$pass = $_ENV['MYSQLPASSWORD'] ?? '';
-$db   = $_ENV['MYSQLDATABASE'] ?? 'alertamujer';
-$port = $_ENV['MYSQLPORT'] ?? 3306;
+include "conexion.php";
 
 $conn = new mysqli($host, $user, $pass, $db, $port);
 if ($conn->connect_error) {
